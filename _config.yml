@@ -1,0 +1,23 @@
+title: "The Hahn Lab"
+name: "Hahn Lab"
+description: "Evolutionary genomics and computational biology"
+url: "https://hahnlab.github.io"
+baseurl: ""
+repository: hahnlab/hahnlab.github.io
+
+remote_theme: mmistakes/minimal-mistakes
+
+nav:
+  - title: "Home"
+    url: /
+  - title: "Research"
+    url: /research/
+  - title: "Publications"
+    url: /publications/
+  - title: "People"
+    url: /people/
+  - title: "Software"
+    url: /software/
+
+plugins:
+  - jekyll-include-cache
