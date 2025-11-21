@@ -1,0 +1,64 @@
+/* CSS Document */
+body {background:#b4c7ff;
+	  font-family:Arial, Helvetica, sans-serif;}
+
+#main{background:#ffffff; margin-top:10px; min-height:500px; }
+
+/*  Page Titles  */
+
+#sitetitle {font-family: "Lucida Sans Unicode", "Lucida Grande", sans-serif;
+			font-variant:small-caps;
+			font-size: 60px;
+			text-align:center;
+			font-stretch:expanded;
+			margin-top:40px;
+			padding-top: 30px;
+			padding-bottom: 30px;
+			margin-bottom:10px;
+			line-height:54px;}
+
+#sitetitle a{text-decoration:none; 
+			 color:#333;}
+			 
+			 
+/*  Navigation Menu  */
+
+#nav {font-family: "Lucida Sans Unicode", "Lucida Grande", sans-serif;
+	  font-variant:small-caps;
+	  font-size: 26px;
+	  text-align:center;
+	  line-height:30px;}
+
+
+#nav ul {text-align:center; list-style:none;}
+#nav ul li{padding: 0px 20px;
+		   margin: 0 0px;
+		   display:inline;}
+#nav ul li:hover{background:#b4c7ff;}
+#nav ul li a {text-decoration:none; color:#333;}
+#nav ul li a:hover {background:#b4c7ff; text-decoration:none;}
+#nav ul li.active {background:#b4c7ff;}
+
+
+/*  Page-specific Style Classes  */
+
+.bluebox {background:#b4c7ff; 
+		  text-indent:20px; 
+		  padding-top: 10px;
+		  }
+.pubmenu{font-weight:bold; 
+		 font-size: 20px;
+		 text-align:center;
+		 }
+ul.publist {padding-left:22px; 
+			padding-top: 10px;
+			}
+ul.publist li {list-style:none;
+		       list-style-position:22px;
+			   text-indent:-22px;
+			   padding-left:22px;
+			   }
+.softwarelist li {margin-bottom:2px;}
+
+/*  General Style Classes  */
+.centered {text-align:center}
