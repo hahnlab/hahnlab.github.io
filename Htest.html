@@ -1,0 +1,46 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<HTML>
+<HEAD>
+   <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+   <META NAME="Author" CONTENT="Karen Gershowitz">
+   <META NAME="GENERATOR" CONTENT="Mozilla/4.08 [en] (Win95; U) [Netscape]">
+   <link REL="SHORTCUT ICON" HREF="favicon.ico" type="image/x-icon">
+   <TITLE>instructions</TITLE>
+</HEAD>
+<BODY TEXT="#000000" BGCOLOR="#FFFFFF" LINK="#0000EE" VLINK="#551A8B" ALINK="#FF0000">
+<FONT COLOR="#FF0000"><FONT SIZE=+1>Instructions for using
+the heterogeneity test</FONT></FONT>
+<p>I am currently only distributing the original Unix version of this software, as other implementations were dependent on old versions of OSX.</p>
+<p>The first step in running the program is saving the&nbsp; 'make_trees.txt' file you downloaded as 'make_trees.pl'.</p>
+<P>In order to run the program you need to supply four simple numbers:
+<P>1. Number of sampled sequences/chromosomes (designated "<FONT COLOR="#FF0000">s</FONT>")
+<BR>2. Number of segregating sites of your putatively neutral class (Synonymous
+mutations would be an obvious choice, but you could use others like non-binding
+sites in promoters; designated "<FONT COLOR="#FF0000">mut_1</FONT>")
+<BR>3. Number of seg. sites of your selected class (usually nonsynonymous,
+but could be e.g. binding sites; designated "<FONT COLOR="#FF0000">mut_2</FONT>")
+<BR>4. Difference in D values.&nbsp; The perl program will run with either
+Tajima's D or Fu and Li's D, and you need to get those values for your
+neutral and selected classes separately and then the difference = (Dneutral
+- Dselected). (designated "<FONT COLOR="#FF0000">observed</FONT>")
+<P>All of this was spelled out in the old Mac OSX version, but you need to know these tags to run it at the command line.
+		<p></p>
+		<p>So the simple command line argument  looks like this (&quot;<FONT COLOR="#FF0000">i</FONT>"
+is the number of iterations you want it to run):
+</p>
+		<P><FONT COLOR="#FF6600">perl make_trees.pl&nbsp; -s 10&nbsp; -mut_1 10&nbsp;
+-mut_2 5&nbsp; -observed 1.2&nbsp; -i 1000&nbsp; -method tajimaD</FONT>
+		<P>The other method is called "<FONT COLOR="#FF0000">fuD</FONT>".&nbsp;
+The output line will be a bit confusing at first.&nbsp; The thing you want
+to know is the "index".&nbsp; This tells you where in the distribution
+your observed is closest to (actually, just smaller than).&nbsp; One output
+line from the above input looks like this:
+<P><FONT COLOR="#FF0000">index 941 value=1.2099 out of 1000 total (obs=1.2000)</FONT>
+		<P>So the p-value is [(total-index)/total] (=.059) for a one-tailed test.  Or, if you get a value in the other extreme (i.e. the reported &quot;index&quot; is close to zero), the p-value would be [(index/total)].<BR>
+			&nbsp;
+
+		<P>Make sure you read the paper and know what the program does before running
+it!
+
+	</BODY>
+</HTML>
