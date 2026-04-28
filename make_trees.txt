@@ -1,0 +1,342 @@
+#!/usr/bin/perl -w
+use strict;
+use vars qw($PRECISION);
+$PRECISION = '10000'; # Let's make the random precision between
+                          # 0->1 to 1000th digits
+
+#structure of a node 
+# $node = { 'time' => '',
+#           'nummut' => 0,
+#           'desc1'    => undef,
+#           'desc2'    => undef,
+#           'ancestor' => undef
+#           'mutations' => [],
+#                              };
+#  
+use Getopt::Long;
+
+
+my $sample_size = 4;
+my $mut_count_1 = 10; # synonymous
+my $mut_count_2 = 20; # non-synonymous
+my $iterations = 1;
+my $verbose = 0;
+my $observedD = undef;
+my $method = 'fuD';
+my $help = 0;
+GetOptions( 
+	    's|samplesize|samp_size:i' => \$sample_size,
+	    'mut_1:i'                  => \$mut_count_1,
+	    'mut_2:i'                  => \$mut_count_2, 
+	    'i|iterations:i'           => \$iterations,
+	    'o|obsered|observedD:f'    => \$observedD, 
+	    'v|verbose'                => \$verbose,
+	    'm|method:s'               => \$method,
+	    'h|help'                   => \$help,
+	    "silent"                   => sub { $verbose = -1; },
+	    );
+
+if( $help ) {
+    die("usage: make_trees.pl -s samplesize -mut_1 synonymous mutation count\n -mut_2 nonsynonmous mutation count \n -i # iterations -o observed D [ -v verbose] -method tajimaD or fuD \n\n [ commands in brackets are optional]");
+}
+if( $method ne 'fuD' and $method ne 'tajimaD' ) {
+    die("available methods are [fu and li's D] (fuD) and Tajima's D (tajimaD)");
+}
+my @D_distribution;  
+printf("sample size is %d iteration count = %d\n", $sample_size, 
+       $iterations);
+
+for(my $iter = 0; $iter < $iterations; $iter++ ) {
+    my @tree1 = &make_tree($sample_size);
+    my $root = $tree1[2*$sample_size - 2];    
+    my $f1 = 0;
+    if( $mut_count_1 > 0 ) {
+	&add_mutations(\@tree1, $sample_size,$mut_count_1);
+	
+	&print_node_desc(\@tree1,$root) if ( $verbose > 0);
+	if( $method eq 'fuD' ) {
+	    $f1 = &fu_and_li_D(\@tree1,$sample_size,$mut_count_1);
+	} elsif( $method eq 'tajimaD' ) {
+	    $f1 = &tajima_D(\@tree1,$sample_size,$mut_count_1);
+	}
+	    print "(mutation count = $mut_count_1)D=$f1\n" 
+		if( $verbose >= 0);
+
+	foreach ( @tree1 ) {
+	    $_->{'nummut'} = 0;
+	    $_->{'mutations'} = [];
+	}
+    }
+    
+    my $f2 = 0;
+    if( $mut_count_2 > 0 ) {
+	&add_mutations(\@tree1, $sample_size,$mut_count_2);
+	&print_node_desc(\@tree1,$root) if( $verbose > 0 );
+	if( $method eq 'fuD' ) {
+	    $f2 = &fu_and_li_D(\@tree1,$sample_size,$mut_count_2);
+	} elsif( $method eq 'tajimaD' ) { 
+	    $f2 = &tajima_D(\@tree1,$sample_size,$mut_count_2);
+	}
+	print "(mutation count = $mut_count_2) D=$f2\n" if( $verbose >= 0);
+
+    }
+    my $deltaD = ( $f1 - $f2 );
+    push @D_distribution, $deltaD;
+    if( $iter % 10 == 0 && $iter > 0 ) { 
+	print STDERR "iter = $iter\n"; 
+    }
+}
+
+if( defined $observedD && $iterations > 1 ) { 
+    my @sortedD = sort { $a <=> $b } @D_distribution;
+    my $i;
+    for($i = 0; $i < scalar @sortedD; $i++ ) {
+	if( $sortedD[$i] > $observedD ) { 
+	    last;
+	}
+    }
+    
+    printf( "index %d value=%.4f out of %d total (obs=%.4f)\n", 
+	    $i, $sortedD[$i], scalar @sortedD, $observedD);
+}
+
+# functions
+    
+# this method builds a tree
+sub make_tree
+{
+    my ($sampsize) = @_;
+    my $in;
+    my @tree = ();
+    my @list = ();
+    # build the list of possible nodes for the tree
+    foreach ( 1..(2*$sampsize - 1) ) { 
+	push @tree, { 'nodenum' => $_ - 1, 
+		      'ancestor' => undef };
+    }
+    # in C we would have 2 arrays
+    # an array of nodes (tree)
+    # and array of pointers to these nodes (list)
+    # and we just shuffle the list items to do the 
+    # tree topology generation
+    # instead in perl, we will have a list of hashes (nodes) called @tree
+    # and a list of integers representing the indexes in tree called @list
+    for($in=0;$in < $sample_size;$in++) {
+	$tree[$in]->{'time'} = 0;
+	$tree[$in]->{'desc1'} = undef;
+	$tree[$in]->{'desc2'} = undef;
+	push @list, $in;
+    }
+    # initialize mutation count for all nodes
+    for($in=0;$in <= 2*$sample_size -1; $in++) {
+	$tree[$in]->{'nummut'} = 0;
+	$tree[$in]->{'mutations'} = [];
+    }
+    
+    my $t=0;
+    # branch
+    # generate times for the nodes which is based on an exponentially
+    # distributed RNG
+    for($in = $sample_size; $in > 1; $in-- ) {
+	$t+= -2.0 * log(1 - rand(1)) / ( $in * ($in-1) );    
+	$tree[2 * $sample_size - $in]->{'time'} =$t;
+    }
+    # topology generation     
+    
+    for ($in = $sample_size; $in > 1; $in-- ) {
+	my $pick = int rand($in);    
+	my $nodeindex = $list[$pick];
+	my $swap = 2 * $sample_size - $in;
+	$tree[$nodeindex]->{'ancestor'} = $swap;
+	$tree[$swap]->{'desc1'} = $nodeindex;	
+	$list[$pick] = $list[$in-1];
+	
+
+	$pick = rand($in-1);    
+	$nodeindex = $list[$pick];
+	$tree[$nodeindex]->{'ancestor'} = $swap;
+	$tree[$swap]->{'desc2'} = $nodeindex;	
+	$list[$pick] = $swap;
+    }
+    return @tree;
+}
+
+# this method add mutations onto a tree in a poisson distribution
+# based on the branch lengths by building a single array
+# with the number of slots representing a branch weighted by the 
+# branch length 
+# 
+# A uniform RNG is used to randomly pick a slot in the array and
+# the slot contains information about which node (and thus which branch)
+# to deposit the mutation on.
+
+sub add_mutations {
+    my ( $tree, $samp_size, $nummut) = @_;
+    my @branches;
+    my @lens;
+    my $branchlen = 0;
+    my $last = 0;
+    for(my $i = 0; $i < 2*$samp_size -1; $i++ ) {	
+	for(my $j=0;$j< $nummut; $j++ ) {
+	    push @{$tree->[$i]->{'mutations'}}, 0;
+	} 
+	my $len =  int (&get_branchlengths($tree,$tree->[$i]) * $PRECISION);
+	if ( $len > 0 ) { 
+	    for( my $j =0;$j < $len;$j++) {
+		$branches[$last++] = $i;
+	    }	
+	}
+	$branchlen += $len;		
+    }
+    # sanity check
+    die("branch len is $branchlen arraylen is $last")
+	unless ( $branchlen == $last );
+    
+    for( my $j = 0; $j < $nummut; $j++)  {
+	my $index = int(rand($branchlen));
+	my $branch = $branches[$index];
+	$tree->[$branch]->{'nummut'}++;
+	$tree->[$branch]->{'mutations'}->[$j] = 1;
+    }    
+    for( my $i = 2*$samp_size -2; $i >= 0; $i-- ) {
+	
+	if( defined $tree->[$i]->{'desc1'} ) {
+	    for( my $j =0; $j < $nummut; $j++ ) {
+		$tree->[$tree->[$i]->{'desc1'}]->{'mutations'}->[$j] ||= $tree->[$i]->{'mutations'}->[$j];
+	    }
+	}
+	if( defined $tree->[$i]->{'desc2'} ) {
+	    for( my $j =0; $j < $nummut; $j++ ) {
+		$tree->[$tree->[$i]->{'desc2'}]->{'mutations'}->[$j] ||= $tree->[$i]->{'mutations'}->[$j];
+	    }
+	}
+    }
+}
+
+# a node's branch length is determined by the difference between
+# the branch 'time' of ones ancestor and one's own 'time'.
+
+sub get_branchlengths {
+    my ($tree,$node) = @_;
+    my $t = 0;    
+    if( defined $node->{'ancestor'} ) {
+	$t = $tree->[$node->{'ancestor'}]->{'time'} -  $node->{'time'};
+    }
+    return $t;
+}
+
+# recursively print a node and all its subnodes
+sub print_node_desc
+{
+    my ($tree,$node,$depth) = @_;
+    $depth = 0 unless defined $depth;
+    return unless defined $node;
+    if( defined $node->{'desc1'} ) {
+	&print_node_desc($tree,$tree->[$node->{'desc1'}],$depth+1);    
+    }
+    for(my $i=0;$i<$depth;$i++) {
+	printf("\t");
+    }    
+    
+    printf( "(node:%d t=%.4f mut=%d desc1=%s desc2=%s)\n",
+	    $node->{'nodenum'},
+	    $node->{'time'}, $node->{'nummut'}, 
+	    defined $node->{'desc1'} ? $node->{'desc1'} : '.', 
+	    defined $node->{'desc2'} ? $node->{'desc2'} : '.' ); 
+    
+    if( defined $node->{'desc2'} ) {
+	&print_node_desc($tree,$tree->[$node->{'desc2'}],$depth+1);    
+    }
+}
+
+# statistical methods
+sub fu_and_li_D {
+    my ($tree,$sampsize,$muttotal) = @_;
+    # root is last node in the tree array
+    
+    # number of tips ($sampsize)
+    # total number of mutations in whole tree ($muttotal)
+    # number of mutations unique to tips (created on 'external' branches)
+    # ($tipcount)
+    my $tipcount = 0; 
+    for(my $i=0; $i< $sampsize; $i++ ) { 
+	$tipcount += $tree->[$i]->{'nummut'};
+    }
+    
+    my $a = 0;
+    for(my $k= 1; $k < $sampsize; $k++ ) {
+	$a += ( 1 / $k );
+    }
+    
+    my $b = 0;
+    for(my $k= 1; $k < $sampsize; $k++ ) {
+	$b += ( 1 / $k**2 );
+    }
+    
+    my $c = 2 * ( ( ( $sampsize * $a ) - (2 * ( $sampsize -1 ))) / 
+		  ( ( $sampsize - 1) * ( $sampsize - 2 ) ) );
+    
+    my $v = 1 + ( ( $a**2 / ( $b + $a**2 ) ) * ( $c - ( ( $sampsize + 1) / 
+							( $sampsize - 1) ) ));
+
+    my $u = $a - 1 - $v;
+    my $D = ( $muttotal - (  $a * $tipcount) ) / 
+	    ( sqrt ( ($u * $muttotal) + ( $v * $muttotal**2) ) );    
+    
+    return $D;
+}
+
+
+sub tajima_D {
+    my ($tree, $sampsize,$muttotal) = @_;
+    my @compare;
+    # we are calculating pi - all pairwise differences between 
+    # tips
+    my $count = 0;
+    my $total = 0;
+    for( my $i = 0; $i < $sampsize; $i++ ) {
+	for( my $j=$i+1; $j< $sampsize; $j++) {	    
+	    $total++;
+	    for(my $m = 0; $m < $muttotal; $m++ ) {
+		$count ++ if( ( defined $tree->[$i]->{'mutations'}->[$m] &&
+				defined $tree->[$j]->{'mutations'}->[$m] )
+			      &&
+			      $tree->[$i]->{'mutations'}->[$m] != 
+			      $tree->[$j]->{'mutations'}->[$m] );
+	    }	    
+	}
+    }
+    my $pi = $count / $total;
+    print "total=$total count=$count pi=$pi\n";
+    my $a1 = 0; 
+    for(my $k= 1; $k < $sampsize; $k++ ) {
+	$a1 += ( 1 / $k );
+    }
+
+     my $a2 = 0;
+     for(my $k= 1; $k < $sampsize; $k++ ) {
+	 $a2 += ( 1 / $k**2 );
+     }
+
+    my $b1 = ( $sampsize + 1 ) / ( 3* ( $sampsize - 1) );
+    my $b2 = ( 2 * ( $sampsize ** 2 + $sampsize + 3) ) / 
+	     ( ( 9 * $sampsize) * ( $sampsize - 1) );
+    my $c1 = $b1 - ( 1 / $a1 );
+    my $c2 = $b2 - ( ( $sampsize + 2 ) /( $a1 * $sampsize))+( $a2 / $a1 ** 2);
+    my $e1 = $c1 / $a1;
+    my $e2 = $c2 / ( $a1**2 + $a2 );
+    
+    my $D = ( $pi - ( $muttotal / $a1 ) ) / 
+	sqrt ( ($e1 * $muttotal) + (( $e2 * $muttotal) * ( $muttotal - 1)));
+
+    return $D;
+}
+# tree utility functions
+sub is_leaf {
+    my $node = @_;
+    return ( ! defined $node->{'desc1'} &&
+	     ! defined $node->{'desc2'} );
+
+}
+
+
